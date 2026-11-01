@@ -10,7 +10,8 @@ const {
   estimateHeartRateFromSkin
 } = require('../src/index.js');
 const {
-  estimatePresenceFromPixels
+  estimatePresenceFromPixels,
+  estimateHeartRateFromSkinPixels
 } = require('../src/camera.js');
 
 test('normalizeAssessment returns bounded values and normalized sex', () => {
@@ -186,4 +187,45 @@ test('estimateHeartRateFromSkin identifies a plausible pulse range', () => {
 
   const bpm = estimateHeartRateFromSkin(samples, sampleRate);
   assert.ok(bpm >= 60 && bpm <= 110, `expected bpm in range, got ${bpm}`);
+});
+
+test('estimateHeartRateFromSkinPixels ignores warm wallpaper when no valid face is present', async () => {
+  const originalDocument = global.document;
+  const width = 80;
+  const height = 80;
+  const pixels = new Uint8ClampedArray(width * height * 4);
+
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const index = (y * width + x) * 4;
+      const stripe = ((x + y * 3) % 14 < 7);
+      pixels[index] = stripe ? 230 : 30;
+      pixels[index + 1] = stripe ? 90 : 15;
+      pixels[index + 2] = stripe ? 95 : 18;
+      pixels[index + 3] = 255;
+    }
+  }
+
+  global.document = {
+    createElement() {
+      return {
+        getContext() {
+          return {
+            drawImage() {},
+            getImageData() {
+              return { data: pixels, width, height };
+            }
+          };
+        }
+      };
+    }
+  };
+
+  try {
+    const video = { videoWidth: width, videoHeight: height, readyState: 4 };
+    const bpm = await estimateHeartRateFromSkinPixels(video, 20, 30);
+    assert.equal(bpm, 0, `expected no pulse reading for warm wallpaper, got ${bpm}`);
+  } finally {
+    global.document = originalDocument;
+  }
 });

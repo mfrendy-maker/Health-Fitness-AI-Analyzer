@@ -24,6 +24,7 @@
   }
 
   let faceDetectorPromise = null;
+  let faceLandmarkerPromise = null;
 
   async function initFaceDetector() {
     if (typeof window === 'undefined' || !window.vision) {
@@ -47,6 +48,33 @@
     }
 
     return faceDetectorPromise;
+  }
+
+  async function initFaceLandmarker() {
+    if (typeof window === 'undefined' || !window.vision) {
+      return null;
+    }
+
+    if (!faceLandmarkerPromise) {
+      faceLandmarkerPromise = (async () => {
+        const { FaceLandmarker, FilesetResolver } = window.vision;
+        const vision = await FilesetResolver.forVisionTasks('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm');
+        return FaceLandmarker.createFromOptions(vision, {
+          baseOptions: {
+            modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task',
+            delegate: 'GPU'
+          },
+          runningMode: 'VIDEO',
+          numFaces: 1,
+          outputFaceBlendshapes: false,
+          minFaceDetectionConfidence: 0.45,
+          minFacePresenceConfidence: 0.45,
+          minTrackingConfidence: 0.45
+        });
+      })();
+    }
+
+    return faceLandmarkerPromise;
   }
 
   function estimatePresenceFromPixels(imageData, width, height) {
@@ -155,41 +183,133 @@
     };
   }
 
-  function estimateHeartRateFromSkinPixels(videoElement, sampleWindow = 90, sampleRate = 30) {
+  function getFaceRoi(width, height, landmarkBounds = null) {
+    const centerX = width / 2;
+    const centerY = height / 2;
+
+    if (landmarkBounds && Number.isFinite(landmarkBounds.x) && Number.isFinite(landmarkBounds.y) && Number.isFinite(landmarkBounds.width) && Number.isFinite(landmarkBounds.height)) {
+      return {
+        x: Math.max(0, Math.floor(landmarkBounds.x * width)),
+        y: Math.max(0, Math.floor(landmarkBounds.y * height)),
+        width: Math.max(20, Math.ceil((landmarkBounds.width || 0.35) * width)),
+        height: Math.max(20, Math.ceil((landmarkBounds.height || 0.35) * height))
+      };
+    }
+
+    return {
+      x: Math.max(0, Math.floor(centerX - width * 0.22)),
+      y: Math.max(0, Math.floor(centerY - height * 0.28)),
+      width: Math.max(40, Math.floor(width * 0.44)),
+      height: Math.max(40, Math.floor(height * 0.56))
+    };
+  }
+
+  function extractFaceSignalFromImage(imageData, width, height, roi = null) {
+    if (!imageData || !imageData.data) {
+      return [];
+    }
+
+    const region = roi || getFaceRoi(width, height);
+    const xStart = Math.max(0, Math.min(width - 1, region.x));
+    const yStart = Math.max(0, Math.min(height - 1, region.y));
+    const xEnd = Math.max(xStart + 10, Math.min(width, xStart + region.width));
+    const yEnd = Math.max(yStart + 10, Math.min(height, yStart + region.height));
+    const samples = [];
+
+    for (let y = yStart; y < yEnd; y += 2) {
+      for (let x = xStart; x < xEnd; x += 2) {
+        const index = (y * width + x) * 4;
+        const r = imageData.data[index];
+        const g = imageData.data[index + 1];
+        const b = imageData.data[index + 2];
+
+        const redGreenGap = r - g;
+        const redBlueGap = r - b;
+        const blueGreenGap = Math.abs(b - g);
+        const isSkinLike = r > 80 && r < 220 && g > 35 && g < 170 && b > 20 && b < 170 && redGreenGap >= 10 && redGreenGap <= 80 && redBlueGap >= 10 && redBlueGap <= 90 && blueGreenGap < 80;
+
+        if (!isSkinLike) {
+          continue;
+        }
+
+        const green = (g * 0.7) + (r * 0.2) + (b * 0.1);
+        samples.push(green);
+      }
+    }
+
+    return samples;
+  }
+
+  function computeFacePresenceFromImageData(imageData, width, height) {
+    if (!imageData || !imageData.data) {
+      return 0;
+    }
+
+    const fallbackPresence = estimatePresenceFromPixels(imageData, width, height);
+    return clamp(fallbackPresence, 0, 1);
+  }
+
+  async function estimateHeartRateFromSkinPixels(videoElement, sampleWindow = 90, sampleRate = 30) {
     if (!videoElement || typeof document === 'undefined') {
       return 0;
     }
 
+    const width = Math.max(80, videoElement.videoWidth || 640);
+    const height = Math.max(80, videoElement.videoHeight || 480);
     const canvas = document.createElement('canvas');
     const context = canvas.getContext('2d');
     if (!context) {
       return 0;
     }
 
-    const width = Math.max(80, videoElement.videoWidth || 640);
-    const height = Math.max(80, videoElement.videoHeight || 480);
     canvas.width = width;
     canvas.height = height;
     context.drawImage(videoElement, 0, 0, width, height);
+    const imageData = context.getImageData(0, 0, width, height);
 
-    const image = context.getImageData(0, 0, width, height).data;
-    const samples = [];
-    const roiWidth = Math.max(40, Math.floor(width * 0.5));
-    const roiHeight = Math.max(40, Math.floor(height * 0.5));
-    const startX = Math.max(0, Math.floor(width * 0.25));
-    const startY = Math.max(0, Math.floor(height * 0.2));
-
-    for (let y = startY; y < startY + roiHeight; y += 2) {
-      for (let x = startX; x < startX + roiWidth; x += 2) {
-        const index = (y * width + x) * 4;
-        const r = image[index];
-        const g = image[index + 1];
-        const b = image[index + 2];
-        const green = (g * 0.7) + (r * 0.2) + (b * 0.1);
-        samples.push(green);
-      }
+    const presenceScore = computeFacePresenceFromImageData(imageData, width, height);
+    if (presenceScore < 0.35) {
+      return 0;
     }
 
+    let landmarkBounds = null;
+    try {
+      const landmarker = await initFaceLandmarker();
+      if (landmarker && typeof performance !== 'undefined') {
+        const result = await landmarker.detectForVideo(videoElement, performance.now());
+        const landmarks = result && Array.isArray(result.faceLandmarks) && result.faceLandmarks.length > 0 ? result.faceLandmarks[0] : null;
+        if (landmarks && landmarks.length) {
+          let minX = Infinity;
+          let minY = Infinity;
+          let maxX = -Infinity;
+          let maxY = -Infinity;
+
+          for (const point of landmarks) {
+            if (!point || typeof point.x !== 'number' || typeof point.y !== 'number') {
+              continue;
+            }
+            minX = Math.min(minX, point.x);
+            minY = Math.min(minY, point.y);
+            maxX = Math.max(maxX, point.x);
+            maxY = Math.max(maxY, point.y);
+          }
+
+          if (Number.isFinite(minX) && Number.isFinite(minY) && Number.isFinite(maxX) && Number.isFinite(maxY)) {
+            landmarkBounds = {
+              x: minX,
+              y: minY,
+              width: maxX - minX,
+              height: maxY - minY
+            };
+          }
+        }
+      }
+    } catch (err) {
+      landmarkBounds = null;
+    }
+
+    const roi = getFaceRoi(width, height, landmarkBounds);
+    const samples = extractFaceSignalFromImage(imageData, width, height, roi);
     if (samples.length < 12) {
       return 0;
     }
@@ -198,7 +318,8 @@
     const slidingWindow = samples.slice(-windowSize);
 
     if (typeof globalThis.HealthFitnessAIAnalyzer !== 'undefined' && typeof globalThis.HealthFitnessAIAnalyzer.estimateHeartRateFromSkin === 'function') {
-      return globalThis.HealthFitnessAIAnalyzer.estimateHeartRateFromSkin(slidingWindow, sampleRate);
+      const bpm = globalThis.HealthFitnessAIAnalyzer.estimateHeartRateFromSkin(slidingWindow, sampleRate);
+      return bpm >= 45 && bpm <= 150 ? bpm : 0;
     }
 
     return 0;
@@ -344,6 +465,7 @@
     clamp,
     listCameraDevices,
     initFaceDetector,
+    initFaceLandmarker,
     estimatePresenceFromPixels,
     detectFacePresence,
     estimateHeartRateFromSkinPixels,
