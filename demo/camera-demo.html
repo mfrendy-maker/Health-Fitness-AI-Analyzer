@@ -250,7 +250,7 @@
         try {
           const detection = await HealthFitnessAIAnalyzerCamera.detectFacePresence(video);
           const motionMetrics = HealthFitnessAIAnalyzerCamera.estimateFrameMetrics(video);
-          const heartRateSignal = HealthFitnessAIAnalyzerCamera.estimateHeartRateFromSkinPixels(video, 90, 30);
+          const heartRateSignal = await HealthFitnessAIAnalyzerCamera.estimateHeartRateFromSkinPixels(video, 90, 30);
           const metrics = {
             ...motionMetrics,
             ...detection,
