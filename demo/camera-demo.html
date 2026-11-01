@@ -300,6 +300,14 @@
           video.srcObject.getTracks().forEach((track) => track.stop());
         }
         statusNode.textContent = 'Camera stopped';
+        overallScore.textContent = 'N/A';
+        healthScore.textContent = 'N/A';
+        functionalScore.textContent = 'N/A';
+        postureScore.textContent = '--';
+        symmetryScore.textContent = '--';
+        mobilityScore.textContent = '--';
+        movementScore.textContent = '--';
+        document.getElementById('heart-rate-score').textContent = '--';
         summaryText.textContent = 'Camera feed is not active yet. Start the live feed to generate a live assessment.';
       });
     </script>

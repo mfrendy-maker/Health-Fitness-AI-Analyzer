@@ -9,6 +9,9 @@ const {
   summarizeCameraFrame,
   estimateHeartRateFromSkin
 } = require('../src/index.js');
+const {
+  estimatePresenceFromPixels
+} = require('../src/camera.js');
 
 test('normalizeAssessment returns bounded values and normalized sex', () => {
   const result = normalizeAssessment({
@@ -120,6 +123,33 @@ test('empty camera frame receives a lower assessment than a real person frame', 
   assert.ok(emptyAssessment.overallScore < personAssessment.overallScore);
   assert.equal(emptyAssessment.status, 'Needs intervention');
   assert.ok(personAssessment.overallScore > 50);
+});
+
+test('estimatePresenceFromPixels detects a face-like skin region even when detector confidence is low', () => {
+  const width = 80;
+  const height = 80;
+  const pixels = new Uint8ClampedArray(width * height * 4);
+
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const i = (y * width + x) * 4;
+      const centerMask = Math.abs(x - width / 2) < 20 && Math.abs(y - height / 2) < 25;
+
+      if (centerMask) {
+        pixels[i] = 170;
+        pixels[i + 1] = 120;
+        pixels[i + 2] = 95;
+      } else {
+        pixels[i] = 30;
+        pixels[i + 1] = 25;
+        pixels[i + 2] = 25;
+      }
+      pixels[i + 3] = 255;
+    }
+  }
+
+  const presence = estimatePresenceFromPixels({ data: pixels, width, height });
+  assert.ok(presence >= 0.35, `expected face-like region to register as person, got ${presence}`);
 });
 
 test('estimateHeartRateFromSkin identifies a plausible pulse range', () => {

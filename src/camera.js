@@ -49,27 +49,93 @@
     return faceDetectorPromise;
   }
 
+  function estimatePresenceFromPixels(imageData, width, height) {
+    if (!imageData || !imageData.data) {
+      return 0;
+    }
+
+    const sourceWidth = Number(width ?? imageData.width ?? 0);
+    const sourceHeight = Number(height ?? imageData.height ?? 0);
+    if (sourceWidth <= 0 || sourceHeight <= 0) {
+      return 0;
+    }
+
+    const { data } = imageData;
+    const centerX = sourceWidth / 2;
+    const centerY = sourceHeight / 2;
+    let skinPixels = 0;
+    let totalPixels = 0;
+    let darkPixels = 0;
+
+    for (let y = 0; y < sourceHeight; y += 1) {
+      for (let x = 0; x < sourceWidth; x += 1) {
+        const distFromCenter = Math.abs(x - centerX) / sourceWidth + Math.abs(y - centerY) / sourceHeight;
+        if (distFromCenter > 0.7) {
+          continue;
+        }
+
+        const index = (y * sourceWidth + x) * 4;
+        const r = data[index];
+        const g = data[index + 1];
+        const b = data[index + 2];
+        const brightness = (r + g + b) / 3;
+
+        totalPixels += 1;
+
+        if (brightness < 28) {
+          darkPixels += 1;
+        }
+
+        const isSkinTone = r > 90 && g > 40 && b > 20 && r > g && r > b && Math.abs(r - g) > 15;
+        if (isSkinTone) {
+          skinPixels += 1;
+        }
+      }
+    }
+
+    if (totalPixels === 0) {
+      return 0;
+    }
+
+    const skinRatio = skinPixels / totalPixels;
+    const brightnessFactor = 1 - darkPixels / totalPixels;
+    const presence = clamp(skinRatio * 1.5 + brightnessFactor * 0.35, 0, 1);
+    return Number(presence.toFixed(3));
+  }
+
   async function detectFacePresence(videoElement) {
     if (!videoElement || typeof window === 'undefined') {
       return { personPresence: 0, hasPerson: false, confidence: 0 };
     }
 
+    let detectorScore = 0;
     const detector = await initFaceDetector();
-    if (!detector) {
-      return { personPresence: 0, hasPerson: false, confidence: 0 };
+    if (detector && videoElement.videoWidth && videoElement.videoHeight) {
+      const result = await detector.detectForVideo(videoElement, performance.now());
+      const detections = Array.isArray(result?.detections) ? result.detections : [];
+      detectorScore = detections.reduce((max, detection) => {
+        const score = Number(detection.categories?.[0]?.score ?? 0);
+        return score > max ? score : max;
+      }, 0);
     }
 
-    const result = await detector.detectForVideo(videoElement, performance.now());
-    const detections = Array.isArray(result?.detections) ? result.detections : [];
-    const strongest = detections.reduce((max, detection) => {
-      const score = Number(detection.categories?.[0]?.score ?? 0);
-      return score > max ? score : max;
-    }, 0);
+    let heuristicScore = 0;
+    if (videoElement.videoWidth && videoElement.videoHeight && typeof document !== 'undefined') {
+      const canvas = document.createElement('canvas');
+      const context = canvas.getContext('2d');
+      if (context) {
+        canvas.width = videoElement.videoWidth;
+        canvas.height = videoElement.videoHeight;
+        context.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
+        const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+        heuristicScore = estimatePresenceFromPixels(imageData, canvas.width, canvas.height);
+      }
+    }
 
-    const personPresence = clamp(strongest, 0, 1);
+    const personPresence = clamp(Math.max(detectorScore, heuristicScore), 0, 1);
     return {
       personPresence: Number(personPresence.toFixed(2)),
-      hasPerson: personPresence >= 0.35,
+      hasPerson: personPresence >= 0.28,
       confidence: Math.round(personPresence * 100)
     };
   }
@@ -263,6 +329,7 @@
     clamp,
     listCameraDevices,
     initFaceDetector,
+    estimatePresenceFromPixels,
     detectFacePresence,
     estimateHeartRateFromSkinPixels,
     estimateFrameMetrics,
