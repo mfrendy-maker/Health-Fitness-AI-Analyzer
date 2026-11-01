@@ -1,0 +1,6 @@
+# Force GitHub language detection to present Python for this repository metadata.
+# This is used to override the default auto-detection shown in the repo "Languages" panel.
+*.js linguist-language=Python
+*.json linguist-language=Python
+*.md linguist-language=Python
+*.bat linguist-language=Python
