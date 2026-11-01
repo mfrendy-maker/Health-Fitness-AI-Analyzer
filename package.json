@@ -1,0 +1,30 @@
+{
+  "name": "@your-github-user/fitness-ai-analyzer",
+  "version": "0.1.0",
+  "description": "Health and fitness assessment package using WHO health risk scoring plus camera-based functional analysis.",
+  "main": "src/index.js",
+  "files": [
+    "src"
+  ],
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
+  "keywords": [
+    "fitness",
+    "health",
+    "wellness",
+    "body-analysis",
+    "posture",
+    "scoring"
+  ],
+  "license": "MIT",
+  "author": "Your Name",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/your-github-user/fitness-ai-analyzer.git"
+  },
+  "bugs": {
+    "url": "https://github.com/your-github-user/fitness-ai-analyzer/issues"
+  },
+  "homepage": "https://github.com/your-github-user/fitness-ai-analyzer#readme"
+}
