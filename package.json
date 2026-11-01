@@ -4,7 +4,9 @@
   "description": "Health and fitness assessment package using WHO health risk scoring plus camera-based functional analysis.",
   "main": "src/index.js",
   "scripts": {
-    "test": "node --test"
+    "test": "node --test",
+    "start": "node server.js",
+    "demo": "node server.js"
   },
   "license": "MIT",
   "author": "mfrendy-maker",
