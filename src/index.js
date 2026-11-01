@@ -1,3 +1,34 @@
+function clampValue(value, min, max) {
+  if (!Number.isFinite(value)) return min;
+  return Math.min(Math.max(value, min), max);
+}
+
+function normalizeSex(sex) {
+  return String(sex || '').trim().toLowerCase();
+}
+
+function normalizeAssessment(input = {}) {
+  const normalized = {
+    ...input,
+    sex: normalizeSex(input.sex),
+    bmi: clampValue(Number(input.bmi), 0, 80),
+    waistCm: clampValue(Number(input.waistCm), 30, 200),
+    hipCm: clampValue(Number(input.hipCm), 30, 220),
+    heightCm: clampValue(Number(input.heightCm), 100, 250),
+    posture: clampValue(Number(input.posture), 0, 100),
+    symmetry: clampValue(Number(input.symmetry), 0, 100),
+    mobility: clampValue(Number(input.mobility), 0, 100),
+    movement: clampValue(Number(input.movement), 0, 100),
+    gait: clampValue(Number(input.gait), 0, 100)
+  };
+
+  if (!['male', 'female'].includes(normalized.sex)) {
+    throw new Error("sex must be 'male' or 'female'");
+  }
+
+  return normalized;
+}
+
 function bmiScore(bmi) {
   if (bmi < 18.5) return 70;
   if (bmi < 25) return 95;
@@ -8,7 +39,7 @@ function bmiScore(bmi) {
 }
 
 function waistScore(waistCm, sex) {
-  const normalizedSex = (sex || '').toLowerCase();
+  const normalizedSex = normalizeSex(sex);
   if (normalizedSex === 'male') {
     if (waistCm <= 94) return 95;
     if (waistCm <= 102) return 70;
@@ -24,7 +55,7 @@ function waistScore(waistCm, sex) {
 
 function whrScore(waistCm, hipCm, sex) {
   const whr = waistCm / hipCm;
-  const normalizedSex = (sex || '').toLowerCase();
+  const normalizedSex = normalizeSex(sex);
   if (normalizedSex === 'male') {
     if (whr <= 0.9) return 95;
     if (whr <= 1.0) return 65;
@@ -65,8 +96,9 @@ function functionalScore({ posture, symmetry, mobility, movement, gait }) {
 }
 
 function overallScore(input) {
-  const who = whoHealthScore(input);
-  const func = functionalScore(input);
+  const normalized = normalizeAssessment(input);
+  const who = whoHealthScore(normalized);
+  const func = functionalScore(normalized);
   return 0.6 * who + 0.4 * func;
 }
 
@@ -76,6 +108,27 @@ function statusLabel(score) {
   if (score >= 55) return 'Moderate';
   if (score >= 40) return 'Elevated risk';
   return 'Needs intervention';
+}
+
+function getPriorityAreas(assessment) {
+  const areas = [
+    { key: 'BMI', score: bmiScore(assessment.bmi), label: 'BMI profile' },
+    { key: 'waist', score: waistScore(assessment.waistCm, assessment.sex), label: 'Waist health' },
+    { key: 'waistToHip', score: whrScore(assessment.waistCm, assessment.hipCm, assessment.sex), label: 'Waist-to-hip ratio' },
+    { key: 'posture', score: assessment.posture, label: 'Posture' },
+    { key: 'symmetry', score: assessment.symmetry, label: 'Symmetry' },
+    { key: 'mobility', score: assessment.mobility, label: 'Mobility' },
+    { key: 'movement', score: assessment.movement, label: 'Movement quality' },
+    { key: 'gait', score: assessment.gait, label: 'Gait and balance' }
+  ];
+
+  return areas
+    .sort((a, b) => a.score - b.score)
+    .slice(0, 3)
+    .map((item) => ({
+      ...item,
+      recommendation: item.score < 60 ? 'Prioritize focused improvement work in this area.' : 'Maintain current progression.'
+    }));
 }
 
 function generateRecommendations(assessment) {
@@ -135,8 +188,9 @@ function generateRecommendations(assessment) {
 }
 
 function createAssessment(input) {
-  const who = whoHealthScore(input);
-  const func = functionalScore(input);
+  const normalized = normalizeAssessment(input);
+  const who = whoHealthScore(normalized);
+  const func = functionalScore(normalized);
   const total = 0.6 * who + 0.4 * func;
 
   return {
@@ -144,11 +198,29 @@ function createAssessment(input) {
     functionalScore: func,
     overallScore: total,
     status: statusLabel(total),
-    recommendations: generateRecommendations(input)
+    recommendations: generateRecommendations(normalized),
+    scoreBreakdown: {
+      health: who,
+      functional: func,
+      overall: total,
+      bmi: bmiScore(normalized.bmi),
+      waist: waistScore(normalized.waistCm, normalized.sex),
+      waistToHip: whrScore(normalized.waistCm, normalized.hipCm, normalized.sex),
+      waistToHeight: waistHeightScore(normalized.waistCm, normalized.heightCm),
+      posture: normalized.posture,
+      symmetry: normalized.symmetry,
+      mobility: normalized.mobility,
+      movement: normalized.movement,
+      gait: normalized.gait
+    },
+    priorities: getPriorityAreas(normalized)
   };
 }
 
 module.exports = {
+  clampValue,
+  normalizeAssessment,
+  normalizeSex,
   bmiScore,
   waistScore,
   whrScore,
@@ -157,6 +229,7 @@ module.exports = {
   functionalScore,
   overallScore,
   statusLabel,
+  getPriorityAreas,
   createAssessment,
   generateRecommendations
 };
