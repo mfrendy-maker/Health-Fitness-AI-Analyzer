@@ -1,0 +1,37 @@
+{
+  "healthScore": 84.6,
+  "functionalScore": 82.4,
+  "overallScore": 83.5,
+  "status": "Good",
+  "personDetected": true,
+  "personPresence": 1,
+  "cameraStatus": "Person detected",
+  "heartRate": 72,
+  "scoreBreakdown": {
+    "health": 84.6,
+    "functional": 82.4,
+    "overall": 83.5,
+    "posture": 81,
+    "symmetry": 67,
+    "mobility": 100,
+    "movement": 94,
+    "gait": 86
+  },
+  "priorities": [
+    {
+      "key": "symmetry",
+      "score": 67,
+      "label": "Symmetry",
+      "recommendation": "Maintain current progression."
+    },
+    {
+      "key": "mobility",
+      "score": 100,
+      "label": "Mobility",
+      "recommendation": "Maintain current progression."
+    }
+  ],
+  "recommendations": [
+    "Your current profile is relatively balanced. Continue with your strength and recovery routine while preserving mobility."
+  ]
+}

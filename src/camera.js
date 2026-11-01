@@ -25,6 +25,7 @@
 
   let faceDetectorPromise = null;
   let faceLandmarkerPromise = null;
+  const pulseHistoryByVideo = new WeakMap();
 
   async function initFaceDetector() {
     if (typeof window === 'undefined' || !window.vision) {
@@ -269,6 +270,7 @@
 
     const presenceScore = computeFacePresenceFromImageData(imageData, width, height);
     if (presenceScore < 0.35) {
+      pulseHistoryByVideo.set(videoElement, []);
       return 0;
     }
 
@@ -314,8 +316,20 @@
       return 0;
     }
 
-    const windowSize = Math.min(sampleWindow, samples.length);
-    const slidingWindow = samples.slice(-windowSize);
+    const pulseMean = samples.reduce((sum, value) => sum + value, 0) / samples.length;
+    const history = pulseHistoryByVideo.get(videoElement) || [];
+    history.push(pulseMean);
+    while (history.length > sampleWindow) {
+      history.shift();
+    }
+    pulseHistoryByVideo.set(videoElement, history);
+
+    if (history.length < 12) {
+      return 0;
+    }
+
+    const windowSize = Math.min(sampleWindow, history.length);
+    const slidingWindow = history.slice(-windowSize);
 
     if (typeof globalThis.HealthFitnessAIAnalyzer !== 'undefined' && typeof globalThis.HealthFitnessAIAnalyzer.estimateHeartRateFromSkin === 'function') {
       const bpm = globalThis.HealthFitnessAIAnalyzer.estimateHeartRateFromSkin(slidingWindow, sampleRate);

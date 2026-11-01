@@ -229,3 +229,64 @@ test('estimateHeartRateFromSkinPixels ignores warm wallpaper when no valid face 
     global.document = originalDocument;
   }
 });
+
+test('estimateHeartRateFromSkinPixels derives a pulse from a real face signal over time', async () => {
+  const originalDocument = global.document;
+  const width = 80;
+  const height = 80;
+  let frame = 0;
+
+  global.document = {
+    createElement() {
+      return {
+        getContext() {
+          return {
+            drawImage() {},
+            getImageData() {
+              const pixels = new Uint8ClampedArray(width * height * 4);
+              const phase = frame / 2;
+
+              for (let y = 0; y < height; y += 1) {
+                for (let x = 0; x < width; x += 1) {
+                  const index = (y * width + x) * 4;
+                  const centerMask = Math.abs(x - width / 2) < 18 && Math.abs(y - height / 2) < 22;
+                  const signal = 120 + Math.sin(phase + x * 0.2) * 10;
+
+                  if (centerMask) {
+                    pixels[index] = 170;
+                    pixels[index + 1] = signal;
+                    pixels[index + 2] = 95;
+                  } else {
+                    pixels[index] = 20;
+                    pixels[index + 1] = 15;
+                    pixels[index + 2] = 18;
+                  }
+                  pixels[index + 3] = 255;
+                }
+              }
+
+              frame += 1;
+              return { data: pixels, width, height };
+            }
+          };
+        }
+      };
+    }
+  };
+
+  try {
+    const video = { videoWidth: width, videoHeight: height, readyState: 4 };
+    let lastBpm = 0;
+
+    for (let i = 0; i < 40; i += 1) {
+      lastBpm = await estimateHeartRateFromSkinPixels(video, 30, 30);
+      if (lastBpm > 0) {
+        break;
+      }
+    }
+
+    assert.ok(lastBpm >= 45 && lastBpm <= 150, `expected temporal face signal to produce a valid bpm, got ${lastBpm}`);
+  } finally {
+    global.document = originalDocument;
+  }
+});

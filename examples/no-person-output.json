@@ -1,0 +1,31 @@
+{
+  "healthScore": 14.7,
+  "functionalScore": 12.1,
+  "overallScore": 13.4,
+  "status": "No valid person detected",
+  "personDetected": false,
+  "personPresence": 0,
+  "cameraStatus": "No face/person detected",
+  "heartRate": 0,
+  "scoreBreakdown": {
+    "health": 14.7,
+    "functional": 12.1,
+    "overall": 13.4,
+    "posture": 0,
+    "symmetry": 0,
+    "mobility": 0,
+    "movement": 0,
+    "gait": 0
+  },
+  "priorities": [
+    {
+      "key": "camera",
+      "score": 0,
+      "label": "Presence detection",
+      "recommendation": "Ensure the camera is pointed at a real person before running assessment."
+    }
+  ],
+  "recommendations": [
+    "No valid face or person was detected. Please turn the camera toward a real person and retry."
+  ]
+}
