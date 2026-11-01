@@ -66,11 +66,15 @@
     let skinPixels = 0;
     let totalPixels = 0;
     let darkPixels = 0;
+    let fillPixels = 0;
 
     for (let y = 0; y < sourceHeight; y += 1) {
       for (let x = 0; x < sourceWidth; x += 1) {
-        const distFromCenter = Math.abs(x - centerX) / sourceWidth + Math.abs(y - centerY) / sourceHeight;
-        if (distFromCenter > 0.7) {
+        const dx = (x - centerX) / sourceWidth;
+        const dy = (y - centerY) / sourceHeight;
+        const distFromCenter = Math.hypot(dx, dy * 1.4);
+        const inFaceBand = distFromCenter < 0.42;
+        if (!inFaceBand) {
           continue;
         }
 
@@ -86,9 +90,14 @@
           darkPixels += 1;
         }
 
-        const isSkinTone = r > 90 && g > 40 && b > 20 && r > g && r > b && Math.abs(r - g) > 15;
+        const isSkinTone = r > 90 && r < 220 && g > 60 && g < 170 && b > 30 && b < 170 && r > g && r > b && Math.abs(r - g) < 70 && Math.abs(r - b) < 90;
         if (isSkinTone) {
           skinPixels += 1;
+        }
+
+        const withinFaceShape = Math.abs(x - centerX) < sourceWidth * 0.22 && Math.abs(y - centerY) < sourceHeight * 0.32;
+        if (withinFaceShape) {
+          fillPixels += 1;
         }
       }
     }
@@ -98,8 +107,10 @@
     }
 
     const skinRatio = skinPixels / totalPixels;
+    const fillRatio = fillPixels / totalPixels;
     const brightnessFactor = 1 - darkPixels / totalPixels;
-    const presence = clamp(skinRatio * 1.5 + brightnessFactor * 0.35, 0, 1);
+    const compactFaceLike = skinRatio > 0.12 && fillRatio > 0.2;
+    const presence = compactFaceLike ? clamp((skinRatio * 2.5) + (brightnessFactor * 0.25), 0, 1) : 0;
     return Number(presence.toFixed(3));
   }
 
@@ -133,9 +144,10 @@
     }
 
     const personPresence = clamp(Math.max(detectorScore, heuristicScore), 0, 1);
+    const hasPerson = personPresence >= 0.5;
     return {
       personPresence: Number(personPresence.toFixed(2)),
-      hasPerson: personPresence >= 0.28,
+      hasPerson,
       confidence: Math.round(personPresence * 100)
     };
   }

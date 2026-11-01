@@ -133,7 +133,7 @@ test('estimatePresenceFromPixels detects a face-like skin region even when detec
   for (let y = 0; y < height; y += 1) {
     for (let x = 0; x < width; x += 1) {
       const i = (y * width + x) * 4;
-      const centerMask = Math.abs(x - width / 2) < 20 && Math.abs(y - height / 2) < 25;
+      const centerMask = Math.abs(x - width / 2) < 18 && Math.abs(y - height / 2) < 22;
 
       if (centerMask) {
         pixels[i] = 170;
@@ -150,6 +150,30 @@ test('estimatePresenceFromPixels detects a face-like skin region even when detec
 
   const presence = estimatePresenceFromPixels({ data: pixels, width, height });
   assert.ok(presence >= 0.35, `expected face-like region to register as person, got ${presence}`);
+});
+
+test('estimatePresenceFromPixels ignores warm wallpaper and does not trigger false person detection', () => {
+  const width = 80;
+  const height = 80;
+  const pixels = new Uint8ClampedArray(width * height * 4);
+
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const i = (y * width + x) * 4;
+      const stripe = ((x + y * 2) % 18 < 8);
+      const red = stripe ? 220 : 35;
+      const green = stripe ? 80 : 20;
+      const blue = stripe ? 90 : 15;
+
+      pixels[i] = red;
+      pixels[i + 1] = green;
+      pixels[i + 2] = blue;
+      pixels[i + 3] = 255;
+    }
+  }
+
+  const presence = estimatePresenceFromPixels({ data: pixels, width, height });
+  assert.ok(presence < 0.35, `expected wallpaper pattern to avoid person detection, got ${presence}`);
 });
 
 test('estimateHeartRateFromSkin identifies a plausible pulse range', () => {
