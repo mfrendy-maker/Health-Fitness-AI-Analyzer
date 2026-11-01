@@ -90,7 +90,10 @@
           darkPixels += 1;
         }
 
-        const isSkinTone = r > 90 && r < 220 && g > 60 && g < 170 && b > 30 && b < 170 && r > g && r > b && Math.abs(r - g) < 70 && Math.abs(r - b) < 90;
+        const redGreenGap = r - g;
+        const redBlueGap = r - b;
+        const blueGreenGap = Math.abs(b - g);
+        const isSkinTone = r > 80 && r < 220 && g > 35 && g < 170 && b > 20 && b < 170 && r > g && r > b && redGreenGap >= 10 && redGreenGap <= 80 && redBlueGap >= 10 && redBlueGap <= 90 && blueGreenGap < 80;
         if (isSkinTone) {
           skinPixels += 1;
         }
@@ -109,8 +112,8 @@
     const skinRatio = skinPixels / totalPixels;
     const fillRatio = fillPixels / totalPixels;
     const brightnessFactor = 1 - darkPixels / totalPixels;
-    const compactFaceLike = skinRatio > 0.12 && fillRatio > 0.2;
-    const presence = compactFaceLike ? clamp((skinRatio * 2.5) + (brightnessFactor * 0.25), 0, 1) : 0;
+    const compactFaceLike = skinRatio > 0.12 && fillRatio > 0.25;
+    const presence = compactFaceLike ? clamp((skinRatio * 2.2) + (brightnessFactor * 0.2), 0, 1) : 0;
     return Number(presence.toFixed(3));
   }
 
