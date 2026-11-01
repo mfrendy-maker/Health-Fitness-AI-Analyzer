@@ -1,5 +1,5 @@
 {
-  "name": "@your-github-user/fitness-ai-analyzer",
+  "name": "@mfrendy-maker/fitness-ai-analyzer",
   "version": "0.1.0",
   "description": "Health and fitness assessment package using WHO health risk scoring plus camera-based functional analysis.",
   "main": "src/index.js",
@@ -18,13 +18,13 @@
     "scoring"
   ],
   "license": "MIT",
-  "author": "Your Name",
+  "author": "mfrendy-maker",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/your-github-user/fitness-ai-analyzer.git"
+    "url": "git+https://github.com/mfrendy-maker/fitness-ai-analyzer.git"
   },
   "bugs": {
-    "url": "https://github.com/your-github-user/fitness-ai-analyzer/issues"
+    "url": "https://github.com/mfrendy-maker/fitness-ai-analyzer/issues"
   },
-  "homepage": "https://github.com/your-github-user/fitness-ai-analyzer#readme"
+  "homepage": "https://github.com/mfrendy-maker/fitness-ai-analyzer#readme"
 }
